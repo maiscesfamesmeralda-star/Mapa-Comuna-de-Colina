@@ -1,0 +1,785 @@
+<!DOCTYPE html>
+<html lang="es"><head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mapa de Colina – Servicios y lugares útiles</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+:root{
+  --azul:#0b57d0; --azul-osc:#08306b; --verde:#1b7f3b; --texto:#1b1f23; --gris:#5b6670; --borde:#c5ced6; --fondo:#f3f6fa;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html{font-size:18px}
+html,body{margin:0;height:100%}
+body{font-family:"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;color:var(--texto);background:var(--fondo);line-height:1.35;display:flex;flex-direction:column;height:100vh;height:100dvh;overflow:hidden}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:4px solid #ffb300;outline-offset:2px}
+[hidden]{display:none!important}
+body:not(.admin) .solo-admin{display:none!important}
+
+/* ---------- Encabezado ---------- */
+.top{background:var(--azul);color:#fff;padding:10px 14px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;box-shadow:0 2px 8px rgba(0,0,0,.25);z-index:1500}
+.marca{display:flex;align-items:center;gap:10px;flex:1;min-width:0;user-select:none}
+.marca .logo{font-size:2rem;line-height:1}
+.marca h1{margin:0;font-size:1.45rem;line-height:1.1}
+.marca p{margin:2px 0 0;font-size:.9rem;opacity:.92}
+.btn-letra{background:#fff;color:var(--azul-osc);border:0;border-radius:12px;min-height:50px;padding:0 14px;font-weight:700;font-size:1rem;cursor:pointer;display:inline-flex;align-items:center;gap:8px}
+.btn-letra b{font-size:1.25rem}
+.sin-red{background:#b3261e;color:#fff;padding:10px 14px;font-weight:600;text-align:center}
+
+/* ---------- Estructura ---------- */
+.layout{flex:1;display:flex;min-height:0;position:relative}
+.panel{width:440px;max-width:100%;background:#fff;border-right:2px solid var(--borde);display:flex;flex-direction:column;z-index:1200;flex-shrink:0}
+.panel-scroll{flex:1;overflow-y:auto;padding:14px 14px 20px}
+.panel-pie{display:none;padding:10px 14px;border-top:2px solid var(--borde);background:#fff}
+.mapwrap{flex:1;position:relative;min-width:0;isolation:isolate}
+#mapa{position:absolute;inset:0;z-index:0;background:#e5e3df;font-family:inherit}
+.error-mapa{padding:30px;font-size:1.3rem;text-align:center}
+
+@media (max-width:899px){
+  .panel{position:absolute;inset:0;width:100%;border-right:0;display:none}
+  .panel.abierto{display:flex}
+  .panel-pie{display:block}
+}
+@media (min-width:900px){ .solo-movil{display:none!important} }
+
+/* ---------- Botones ---------- */
+.btn{min-height:56px;padding:10px 18px;border-radius:14px;border:2px solid transparent;font-weight:700;font-size:1.05rem;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:8px;text-decoration:none;text-align:center;line-height:1.15}
+.btn-primario{background:var(--azul);color:#fff}
+.btn-llamar{background:var(--verde);color:#fff}
+.btn-sec{background:#e8eef9;color:var(--azul-osc);border-color:#b3c6ee}
+.btn-ancho{width:100%}
+.btn:active{transform:scale(.98)}
+
+/* ---------- Panel: inicio ---------- */
+.ayuda{background:#fff8e1;border:2px solid #f2c94c;border-radius:14px;padding:12px 14px;margin-bottom:14px}
+.ayuda b{display:block;margin-bottom:4px}
+.ayuda ol{margin:0;padding-left:1.3em}
+.buscador{display:flex;gap:8px;margin-bottom:14px}
+.buscador input{flex:1;min-width:0;min-height:56px;font-size:1.1rem;padding:0 14px;border:3px solid var(--azul);border-radius:14px;background:#fff}
+.buscador .btn{min-height:56px;padding:0 14px}
+.titulo-sec{font-size:1.25rem;margin:4px 0 10px}
+.tiles{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px}
+.tile{background:#fff;border:3px solid var(--c,#1a73e8);border-radius:16px;padding:12px 10px;min-height:128px;text-align:center;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:4px}
+.tile .ico{width:52px;height:52px;border-radius:50%;background:var(--c);display:flex;align-items:center;justify-content:center;font-size:1.7rem;border:3px solid #fff;box-shadow:0 0 0 2px var(--c)}
+.tile .nom{font-weight:800;font-size:1.1rem;line-height:1.1;overflow-wrap:anywhere}
+.tile .des{font-size:.85rem;color:var(--gris);line-height:1.2}
+.tile .num{font-size:.85rem;font-weight:700;color:var(--azul-osc)}
+.tile:hover{background:#f1f6ff}
+.tile.ancho{grid-column:1 / -1;flex-direction:row;text-align:left;min-height:84px;gap:12px;padding:10px 14px}
+.tile .tx{display:flex;flex-direction:column;align-items:center;gap:3px;min-width:0}
+.tile.ancho .tx{align-items:flex-start}
+
+/* ---------- Panel: lista ---------- */
+.lista-cab{display:flex;align-items:center;gap:10px;margin-bottom:6px}
+.lista-cab h2{margin:0;font-size:1.3rem;flex:1}
+.lista-sub{color:var(--gris);margin:0 0 10px}
+.item{display:flex;align-items:center;gap:12px;width:100%;text-align:left;background:#fff;border:2px solid var(--borde);border-left:8px solid var(--c);border-radius:14px;padding:10px 12px;margin-bottom:10px;min-height:76px;cursor:pointer}
+.item:hover{background:#f1f6ff}
+.item .ico{font-size:1.6rem;flex-shrink:0}
+.item .tx{flex:1;min-width:0}
+.item .nom{display:block;font-weight:800;font-size:1.08rem;line-height:1.2}
+.item .dir{display:block;color:var(--gris);font-size:.92rem;margin-top:2px}
+.item .fl{font-size:1.5rem;color:var(--azul);font-weight:900}
+.vacio{background:#fff;border:2px dashed var(--borde);border-radius:14px;padding:18px;text-align:center}
+
+/* ---------- Mapa: controles ---------- */
+.sup-izq{position:absolute;top:12px;left:12px;z-index:1000;display:flex;flex-direction:column;gap:10px;max-width:calc(100% - 110px);align-items:flex-start}
+.sup-izq .btn{background:#fff;color:var(--azul-osc);border-color:var(--azul);box-shadow:0 2px 8px rgba(0,0,0,.3)}
+.filtro{background:#fff;border:2px solid var(--azul);border-radius:14px;padding:8px 10px;box-shadow:0 2px 8px rgba(0,0,0,.3);display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-weight:700}
+.filtro button{min-height:44px;border:2px solid #b3c6ee;background:#e8eef9;border-radius:10px;font-weight:700;padding:0 12px;cursor:pointer;color:var(--azul-osc)}
+.ctrl{position:absolute;top:12px;right:12px;z-index:1000;display:flex;flex-direction:column;gap:10px}
+.ctrl button{width:78px;min-height:68px;background:#fff;border:2px solid #7d8b97;border-radius:14px;box-shadow:0 2px 8px rgba(0,0,0,.3);cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;font-weight:700;font-size:.8rem;padding:4px;line-height:1.1}
+.ctrl button span{font-size:1.7rem;line-height:1;font-weight:800}
+.ctrl button:active{background:#e8eef9}
+
+.aviso{position:absolute;top:12px;left:50%;transform:translateX(-50%);z-index:1600;background:#263238;color:#fff;border-radius:14px;padding:12px 18px;font-weight:600;box-shadow:0 4px 14px rgba(0,0,0,.4);max-width:min(92%,520px);text-align:center}
+.aviso.modo{background:#e65100;cursor:pointer;border:2px solid #fff}
+
+/* ---------- Ficha ---------- */
+.ficha{position:absolute;left:12px;bottom:12px;right:12px;max-width:580px;max-height:62%;overflow-y:auto;background:#fff;border-radius:18px;box-shadow:0 6px 24px rgba(0,0,0,.4);z-index:1100;overscroll-behavior:contain}
+.ficha-barra{height:10px;position:sticky;top:0;z-index:2}
+.ficha-cuerpo{padding:12px 16px 16px}
+.ficha-top{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:6px}
+.chip{display:inline-block;padding:4px 12px;border-radius:20px;font-weight:700;font-size:.9rem;color:#fff;background:var(--c)}
+.chip.oscuro{color:#1b1f23}
+.btn-cerrar{min-height:48px;padding:6px 14px}
+.ficha h2{margin:4px 0 10px;font-size:1.5rem;line-height:1.15}
+.fila{display:flex;gap:10px;margin:8px 0;align-items:flex-start}
+.fila .i{font-size:1.4rem;line-height:1.2;flex-shrink:0;width:1.8rem;text-align:center}
+.fila .t small{display:block;color:var(--gris);font-weight:700;font-size:.8rem;text-transform:uppercase;letter-spacing:.03em}
+.fila .t div{font-size:1.1rem}
+.nota{background:#fff8e1;border-left:6px solid #f2c94c;border-radius:8px;padding:8px 10px;margin:10px 0;font-size:.95rem}
+.acciones{display:flex;flex-wrap:wrap;gap:10px;margin-top:12px}
+.acciones .btn{flex:1 1 180px}
+
+/* Edición (administrador) */
+.edicion{margin-top:14px;border:2px dashed #e65100;border-radius:12px;padding:8px 10px;background:#fff8f2}
+.edicion summary{font-weight:800;cursor:pointer;padding:8px 0;color:#bf360c}
+.edicion label{display:block;font-weight:700;font-size:.85rem;margin:8px 0 3px}
+.edicion input,.edicion select,.edicion textarea{width:100%;padding:8px;border:2px solid #bbb;border-radius:8px;background:#fff}
+.edicion textarea{min-height:80px}
+.edicion .par{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.edicion .btn{min-height:44px;font-size:.95rem;margin-top:6px}
+.fila-btns{display:flex;gap:8px;flex-wrap:wrap}
+.fila-btns .btn{flex:1 1 140px}
+.btn-peligro{background:#ffebee;color:#b71c1c;border-color:#ef9a9a}
+
+.admin-barra{background:#fff3e0;border:2px solid #e65100;border-radius:14px;padding:10px;margin-bottom:14px}
+.admin-barra h3{margin:0 0 8px;font-size:1.05rem;color:#bf360c}
+.admin-barra .btn{min-height:46px;font-size:.92rem;padding:6px 10px}
+.admin-barra .cont{font-size:.85rem;color:var(--gris);margin-top:6px}
+
+/* ---------- Marcadores ---------- */
+.pin{background:none;border:0}
+.pin span{display:flex;align-items:center;justify-content:center;width:100%;height:100%;border-radius:50%;border:3px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.55);font-size:20px;line-height:1;transition:transform .15s}
+.zoom-lejos .pin span{transform:scale(.55)}
+.pin.sel span{transform:scale(1.4)!important;border-color:#ffb300;box-shadow:0 0 0 5px rgba(255,179,0,.5),0 3px 10px rgba(0,0,0,.6)}
+.yo{background:none;border:0}
+.yo span{display:block;white-space:nowrap;background:#0b57d0;color:#fff;font-weight:800;padding:6px 10px;border-radius:20px;border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.5);transform:translate(-50%,-50%);font-size:.95rem}
+.leaflet-container{font-family:inherit}
+
+@media (max-width:700px){
+  .marca p{display:none}
+  .marca h1{font-size:1.25rem}
+  .btn-letra{min-height:46px;padding:0 10px}
+  .ctrl button{width:68px;min-height:60px}
+  .ficha{max-height:58%}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="marca" id="marca">
+    <span class="logo" aria-hidden="true">🗺️</span>
+    <div><h1 id="titulo">Mapa de Colina</h1><p>Servicios y lugares útiles de la comuna</p></div>
+  </div>
+  <button class="btn-letra" id="btnLetra" type="button" aria-label="Cambiar el tamaño de la letra"><b>Aa</b><span id="letraEtiqueta">Letra: Normal</span></button>
+</header>
+<div class="sin-red" id="sinRed" hidden="">Parece que no hay internet. El mapa necesita internet para mostrarse.</div>
+
+<main class="layout">
+  <section class="panel" id="panel" aria-label="Lista de lugares">
+    <div class="panel-scroll" id="panelScroll">
+
+      <div class="admin-barra solo-admin" id="adminBarra">
+        <h3>🔧 Modo administrador</h3>
+        <div class="fila-btns">
+          <button class="btn btn-sec" id="adAgregar" type="button">➕ Agregar lugar</button>
+          <button class="btn btn-sec" id="adExportar" type="button">💾 Guardar respaldo</button>
+          <button class="btn btn-sec" id="adImportar" type="button">📂 Cargar respaldo / KML</button>
+          <button class="btn btn-primario" id="adCompartir" type="button">📤 Crear archivo para compartir</button>
+          <button class="btn btn-peligro" id="adReset" type="button">🔄 Borrar mis cambios</button>
+          <button class="btn btn-sec" id="adSalir" type="button">Salir</button>
+        </div>
+        <div class="cont" id="editCount">11 cambios guardados en este aparato</div>
+        <div class="cont" id="poblacionStatus">158 polígonos de poblaciones cargados.</div>
+      </div>
+
+      <div class="buscador">
+        <input id="buscar" type="search" inputmode="search" autocomplete="off" placeholder="Escriba lo que busca…" aria-label="Buscar un lugar">
+        <button class="btn btn-sec" id="btnBorrar" type="button">Borrar</button>
+      </div>
+
+      <div id="panelInicio" hidden="">
+        <div class="ayuda">
+          <b>¿Cómo usar este mapa?</b>
+          <ol>
+            <li>Toque el tema que busca (por ejemplo, <b style="display:inline">Salud</b>).</li>
+            <li>Toque el lugar de la lista.</li>
+            <li>Toque <b style="display:inline">Cómo llegar</b>.</li>
+          </ol>
+        </div>
+        <h2 class="titulo-sec">¿Qué necesita encontrar?</h2>
+        <div class="tiles" id="tiles" data-dinamico=""></div>
+      </div>
+
+      <div id="panelLista">
+        <div class="lista-cab">
+          <button class="btn btn-sec" id="btnInicio" type="button">← Volver</button>
+          <h2 id="listaTitulo">Resultados</h2>
+        </div>
+        <p class="lista-sub" id="listaSub">Usted buscó “colo”. 3 lugares.</p>
+        <div id="listaItems" data-dinamico=""></div>
+      </div>
+    </div>
+    <div class="panel-pie">
+      <button class="btn btn-primario btn-ancho" id="btnVerMapa" type="button">🗺️ Ver en el mapa</button>
+    </div>
+  </section>
+
+  <section class="mapwrap" aria-label="Mapa">
+    <div id="mapa" data-dinamico=""></div>
+
+    <div class="sup-izq">
+      <button class="btn solo-movil" id="btnLista" type="button">☰ Lista de lugares</button>
+      <div class="filtro" id="filtro">
+        <span id="filtroTxt">Búsqueda: “colo” (3)</span>
+        <button id="filtroQuitar" type="button">Ver todos ✕</button>
+      </div>
+    </div>
+
+    <div class="ctrl" aria-label="Controles del mapa">
+      <button id="zMas" type="button" aria-label="Acercar el mapa"><span>＋</span>Acercar</button>
+      <button id="zMenos" type="button" aria-label="Alejar el mapa"><span>－</span>Alejar</button>
+      <button id="btnYo" type="button" aria-label="Mostrar dónde estoy"><span>📍</span>Mi ubicación</button>
+    </div>
+
+    <div class="aviso" id="aviso" role="status" aria-live="polite" hidden="">✅ Coordenadas guardadas.</div>
+    <article class="ficha" id="ficha" data-dinamico="" hidden=""></article>
+  </section>
+</main>
+
+<noscript><p style="padding:20px;font-size:1.3rem">Para ver el mapa necesita activar JavaScript en su navegador.</p></noscript>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script id="datos-publicados">const DATOS_PUBLICADOS = {"cesfam":{"Esmeralda":"CESFAM Esmeralda"},"resenas":{},"correccionesHitos":{"Liceo Esmeralda":{"lat":-33.18457275243088,"lng":-70.65181016921998},"OK BUSES":{"lat":-33.17989890277805,"lng":-70.65148594768115,"direccion":"Coquimbo 108, 9351673 Colina, Región Metropolitana"},"SPA Esmeralda":{"lat":-33.1838430695552,"lng":-70.65287030350206},"Colectivo Esmeralda Línea 8017":{"lat":-33.18253334628506,"lng":-70.65006293418831},"Escuela Básica Valle Verde de Colina":{"lat":-33.18083512534109,"lng":-70.67172429000959},"Jardin Infantil Los Tres Ositos":{"lat":-33.18191036099075,"lng":-70.65133273601533},"COLEGIO ABERSAN":{"lat":-33.18276997354203,"lng":-70.65438104045231},"Posta de Salud Rural Chacabuco":{"lat":-33.02891230362725,"lng":-70.69449803419558},"Posta de Salud Rural El Colorado":{"telefono":"","lat":-33.07349,"lng":-70.72122}},"hitosNuevos":[{"categoria":"Deporte","nombre":"Club deportivo Juventud Chacabuco","direccion":"","telefono":"","lat":-33.07433096712223,"lng":-70.71588277816774,"estado":"ok"}],"hitosEliminados":[]};</script>
+<script>
+(function(){
+'use strict';
+
+const $ = id => document.getElementById(id);
+const CAT_POBL = 'Poblaciones y Villas';
+
+if (typeof L === 'undefined') {
+  $('mapa').innerHTML = '<div class="error-mapa"><b>No se pudo cargar el mapa.</b><br>Revise que tenga internet y vuelva a abrir este archivo.</div>';
+  $('panel').classList.add('abierto');
+  return;
+}
+
+/* ================= Datos ================= */
+const PUB = (typeof DATOS_PUBLICADOS !== 'undefined' && DATOS_PUBLICADOS) ? DATOS_PUBLICADOS : {};
+
+const CESFAM_OPCIONES = [
+  "CESFAM Colina","CESFAM Colina (Posta Las Canteras)","CESFAM Colina (Posta Los Ingleses)","CESFAM Colina (Posta Santa Marta de Liray)",
+  "CESFAM Esmeralda","CESFAM Esmeralda (Posta Chacabuco)","CESFAM Esmeralda (Posta El Colorado)",
+  "CESFAM La Reina","CESFAM La Reina (CECOSF Villa Oro Olímpico)","No determinado"
+];
+
+const COLORES = {
+  "Salud":"#d93025","Municipal":"#1a73e8","Seguridad":"#f9ab00","Servicios":"#9334e6",
+  "Educación":"#188038","Plazas":"#00838f","Comercio":"#e8710a","Transporte":"#00acc1","Restaurantes":"#d81b60",
+  "Iglesias":"#795548","Organizaciones":"#546e7a","Poblaciones y Villas":"#1565c0",
+  "Hitos Nuevos":"#00838f","KML Importado":"#d81b60"
+};
+const CAT_INFO = {
+  "Salud":{e:"🏥",d:"Consultorios, postas, farmacias y urgencias",s:"consultorio cesfam posta hospital doctor medico urgencia sapu farmacia remedios dentista"},
+  "Municipal":{e:"🏛️",d:"Municipalidad, biblioteca y cultura",s:"municipio alcaldia muni biblioteca cultura deportes"},
+  "Seguridad":{e:"👮",d:"Carabineros, bomberos y emergencias",s:"policia carabineros bomberos emergencia ambulancia cruz roja"},
+  "Servicios":{e:"📄",d:"Registro Civil, Enel y otros trámites",s:"tramite registro civil carnet luz electricidad"},
+  "Educación":{e:"🎓",d:"Colegios y liceos",s:"colegio escuela liceo jardin infantil instituto"},
+  "Plazas":{e:"🌳",d:"Plazas y parques",s:"parque area verde plaza juegos"},
+  "Comercio":{e:"🛒",d:"Panaderías y bencineras",s:"tienda panaderia pan bencina negocio"},
+  "Transporte":{e:"🚌",d:"Buses, terminales y colectivos",s:"bus colectivo terminal"},
+  "Restaurantes":{e:"🍽️",d:"Dónde comer",s:"comer almuerzo comida picada restaurant"},
+  "Iglesias":{e:"⛪",d:"Parroquias y capillas",s:"parroquia capilla templo misa iglesia"},
+  "Organizaciones":{e:"👥",d:"Clubes y agrupaciones",s:"club junta de vecinos agrupacion adulto mayor taller"},
+  "Poblaciones y Villas":{e:"🏘️",d:"Encuentre su población y su consultorio",s:"villa barrio sector poblacion cesfam"},
+  "Hitos Nuevos":{e:"📍",d:"Lugares agregados",s:""},
+  "KML Importado":{e:"📌",d:"Lugares importados",s:""}
+};
+const ORDEN = ["Salud","Municipal","Seguridad","Servicios","Educación","Plazas","Comercio","Transporte","Restaurantes","Iglesias","Organizaciones",CAT_POBL];
+const infoCat = c => CAT_INFO[c] || {e:"📍",d:"",s:""};
+const colorCat = c => COLORES[c] || "#1a73e8";
+
+const K = {
+  asig:'cesfam_asignaciones_colina_v10', res:'resenas_colina_v10', corr:'correcciones_hitos_colina_v2',
+  nuevos:'hitos_nuevos_colina_v1', elim:'hitos_eliminados_colina_v1', letra:'mapa_colina_letra_v1'
+};
+function leer(k, def){ try{ const v = localStorage.getItem(k); return v ? JSON.parse(v) : def; }catch(e){ return def; } }
+function escribir(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} contarEdiciones(); }
+function unirPorNombre(a,b){ const m = new Map(); [...(a||[]),...(b||[])].forEach(h => m.set(h.nombre,h)); return [...m.values()]; }
+const cargarAsig  = () => Object.assign({}, PUB.cesfam||{}, leer(K.asig,{}));
+const cargarRes   = () => Object.assign({}, PUB.resenas||{}, leer(K.res,{}));
+const cargarCorr  = () => { const a = PUB.correccionesHitos||{}, b = leer(K.corr,{}), o = Object.assign({},a); Object.keys(b).forEach(k => { o[k] = Object.assign({}, a[k]||{}, b[k]); }); return o; };
+const cargarNuevos= () => unirPorNombre(PUB.hitosNuevos, leer(K.nuevos,[]));
+const cargarElim  = () => Array.from(new Set([...(PUB.hitosEliminados||[]), ...leer(K.elim,[])]));
+
+let asig = cargarAsig(), res = cargarRes(), corr = cargarCorr(), nuevos = cargarNuevos(), elim = cargarElim();
+
+function contarEdiciones(){
+  const u = new Set([...Object.keys(leer(K.asig,{})), ...Object.keys(leer(K.res,{})), ...Object.keys(leer(K.corr,{}))]);
+  const t = u.size + leer(K.nuevos,[]).length + leer(K.elim,[]).length;
+  const el = $('editCount'); if (el) el.textContent = t + ' cambio' + (t===1?'':'s') + ' guardado' + (t===1?'':'s') + ' en este aparato';
+}
+
+const servicios = [{"categoria":"Poblaciones y Villas","nombre":"Población Las Américas","direccion":"Sector Urbano / Lo Seco, Colina","lat":-33.192,"lng":-70.669,"estado":"ok"},{"categoria":"Poblaciones y Villas","nombre":"Población Corvi","direccion":"Sector Urbano Central, Colina","lat":-33.203,"lng":-70.672,"estado":"ok"},{"categoria":"Poblaciones y Villas","nombre":"Población San Alberto","direccion":"Sector Urbano, Colina","lat":-33.194,"lng":-70.669,"estado":"ok"},{"categoria":"Poblaciones y Villas","nombre":"Población Centenario I y II","direccion":"Sector Urbano, Colina","lat":-33.187,"lng":-70.663,"estado":"ok"},{"categoria":"Poblaciones y Villas","nombre":"Población Claudio Arrau","direccion":"Sector Urbano, Colina","lat":-33.19385,"lng":-70.66915,"estado":"ok"},{"categoria":"Poblaciones y Villas","nombre":"Población San Alfonso","direccion":"Sector Urbano, Colina","lat":-33.205,"lng":-70.68,"estado":"ok"},{"categoria":"Poblaciones y Villas","nombre":"Población Uno","direccion":"Sector Urbano, Colina","lat":-33.2,"lng":-70.675,"estado":"ok"},{"categoria":"Poblaciones y Villas","nombre":"Villa Portal Andino","direccion":"Sector Urbano, Colina","lat":-33.191,"lng":-70.665,"estado":"ok"},{"categoria":"Poblaciones y Villas","nombre":"Villa Magdalena Petit","direccion":"Sector Urbano, Colina","lat":-33.21,"lng":-70.68,"estado":"ok"},{"categoria":"Poblaciones y Villas","nombre":"Villa Araucarias","direccion":"Sector Urbano, Colina","lat":-33.208,"lng":-70.685,"estado":"ok"},{"categoria":"Poblaciones y Villas","nombre":"Villa Esperanza","direccion":"Sector Urbano, Colina","lat":-33.195,"lng":-70.674,"estado":"ok"},{"categoria":"Poblaciones y Villas","nombre":"Villa San Andrés I y II","direccion":"Sector Urbano, Colina","lat":-33.202,"lng":-70.679,"estado":"ok"},{"categoria":"Poblaciones y Villas","nombre":"Villa Oro Olímpico","direccion":"Sector La Reina, Colina","lat":-33.184,"lng":-70.663,"estado":"ok"},{"categoria":"Poblaciones y Villas","nombre":"Villa Cumbres Blancas","direccion":"Sector Urbano, Colina","lat":-33.19,"lng":-70.66,"estado":"ok"},{"categoria":"Poblaciones y Villas","nombre":"Villa La Ilusión de los Aromos","direccion":"Sector Urbano, Colina","lat":-33.185,"lng":-70.65,"estado":"ok"},{"categoria":"Poblaciones y Villas","nombre":"Villa El Esfuerzo","direccion":"Sector Urbano, Colina","lat":-33.18685,"lng":-70.66315,"estado":"ok"},{"categoria":"Poblaciones y Villas","nombre":"Villa San Isidro","direccion":"Sector Urbano, Colina","lat":-33.194,"lng":-70.671,"estado":"ok"},{"categoria":"Poblaciones y Villas","nombre":"Sector Reina Sur / La Reina","direccion":"Sector La Reina, Colina","lat":-33.189,"lng":-70.675,"estado":"ok"},{"categoria":"Poblaciones y Villas","nombre":"Sector Santa Filomena","direccion":"Santa Filomena, Colina","lat":-33.175,"lng":-70.67,"estado":"ok"},{"categoria":"Poblaciones y Villas","nombre":"Sector Luis Cruz Martínez","direccion":"Sector Urbano, Colina","lat":-33.201,"lng":-70.675,"estado":"ok"},{"categoria":"Poblaciones y Villas","nombre":"Sector La Montaña / Valle Grande","direccion":"Sector Sur, Colina","lat":-33.31,"lng":-70.7,"estado":"ok"},{"categoria":"Poblaciones y Villas","nombre":"Parque Los Libertadores","direccion":"Ruta 5 Norte, Colina","lat":-33.28,"lng":-70.71,"estado":"ok"},{"categoria":"Poblaciones y Villas","nombre":"Sector O'Higgins","direccion":"Sector Urbano, Colina","lat":-33.182,"lng":-70.648,"estado":"ok"},{"categoria":"Poblaciones y Villas","nombre":"Sector Chicureo","direccion":"Chicureo, Colina","lat":-33.27,"lng":-70.63,"estado":"ok"},{"categoria":"Poblaciones y Villas","nombre":"Sector Chamisero","direccion":"Chamisero, Colina","lat":-33.32,"lng":-70.58,"estado":"ok"},{"categoria":"Poblaciones y Villas","nombre":"Sector Las Canteras","direccion":"Las Canteras, Colina","lat":-33.304,"lng":-70.689,"estado":"ok"},{"categoria":"Poblaciones y Villas","nombre":"Sector Esmeralda","direccion":"Esmeralda, Colina","lat":-33.184,"lng":-70.653,"estado":"ok"},{"categoria":"Poblaciones y Villas","nombre":"Casas de Chacabuco","direccion":"Chacabuco, Colina","lat":-33.17,"lng":-70.63,"estado":"ok"},{"categoria":"Poblaciones y Villas","nombre":"Población Los Robles","direccion":"Colina centro","lat":-33.196,"lng":-70.672,"estado":"referencial"},{"categoria":"Poblaciones y Villas","nombre":"Población Los Álamos","direccion":"Colina centro","lat":-33.1925,"lng":-70.67,"estado":"referencial"},{"categoria":"Poblaciones y Villas","nombre":"Población Héroes de Arica","direccion":"Colina centro","lat":-33.1905,"lng":-70.671,"estado":"referencial"},{"categoria":"Poblaciones y Villas","nombre":"Población Van der Rest","direccion":"Colina centro","lat":-33.1915,"lng":-70.673,"estado":"referencial"},{"categoria":"Poblaciones y Villas","nombre":"Población Víctor Olivera","direccion":"Colina centro","lat":-33.194,"lng":-70.6675,"estado":"referencial"},{"categoria":"Poblaciones y Villas","nombre":"Población Gabriela Mistral","direccion":"Colina centro","lat":-33.197,"lng":-70.6685,"estado":"referencial"},{"categoria":"Poblaciones y Villas","nombre":"Población El Estero","direccion":"Colina centro","lat":-33.199,"lng":-70.6695,"estado":"referencial"},{"categoria":"Poblaciones y Villas","nombre":"Población Las Termas","direccion":"Colina centro","lat":-33.1985,"lng":-70.6725,"estado":"referencial"},{"categoria":"Poblaciones y Villas","nombre":"Población Óscar Bonilla","direccion":"Colina centro","lat":-33.2,"lng":-70.6705,"estado":"referencial"},{"categoria":"Poblaciones y Villas","nombre":"Población Los Gobernadores","direccion":"Colina centro","lat":-33.201,"lng":-70.668,"estado":"referencial"},{"categoria":"Poblaciones y Villas","nombre":"Población La Ribera","direccion":"Sector ribera del río Colina","lat":-33.183,"lng":-70.6485,"estado":"referencial"},{"categoria":"Poblaciones y Villas","nombre":"Población San Martín","direccion":"Sector San Martín","lat":-33.1875,"lng":-70.657,"estado":"referencial"},{"categoria":"Poblaciones y Villas","nombre":"Población Las Águilas","direccion":"Sector San Martín / norte urbano","lat":-33.1885,"lng":-70.66,"estado":"referencial"},{"categoria":"Poblaciones y Villas","nombre":"Villa Pacífico","direccion":"Colina centro-norte","lat":-33.1895,"lng":-70.664,"estado":"referencial"},{"categoria":"Poblaciones y Villas","nombre":"Villa Fernando Alegría","direccion":"Colina centro-norte","lat":-33.1865,"lng":-70.665,"estado":"referencial"},{"categoria":"Poblaciones y Villas","nombre":"Villa Valle Verde","direccion":"Sector Valle Verde","lat":-33.1982,"lng":-70.6625,"estado":"referencial"},{"categoria":"Poblaciones y Villas","nombre":"Población José Fuentes Guerra","direccion":"Colina centro","lat":-33.193,"lng":-70.6665,"estado":"referencial"},{"categoria":"Poblaciones y Villas","nombre":"Población Dos","direccion":"Colina centro","lat":-33.199,"lng":-70.675,"estado":"referencial"},{"categoria":"Poblaciones y Villas","nombre":"Población La Caravana","direccion":"Colina centro","lat":-33.1955,"lng":-70.678,"estado":"referencial"},{"categoria":"Poblaciones y Villas","nombre":"Población Glorias Navales","direccion":"Sector Esmeralda","lat":-33.1838,"lng":-70.652,"estado":"referencial"},{"categoria":"Poblaciones y Villas","nombre":"Villa Héroes de Chacabuco I","direccion":"Sector urbano norte","lat":-33.188,"lng":-70.666,"estado":"referencial"},{"categoria":"Poblaciones y Villas","nombre":"Villa Héroes de Chacabuco II","direccion":"Sector urbano norte","lat":-33.187,"lng":-70.6665,"estado":"referencial"},{"categoria":"Poblaciones y Villas","nombre":"Villa Héroes de Chacabuco III","direccion":"Sector urbano norte","lat":-33.186,"lng":-70.666,"estado":"referencial"},{"categoria":"Poblaciones y Villas","nombre":"Villa Cordillera I, II y III","direccion":"Colina centro","lat":-33.194,"lng":-70.67,"estado":"referencial"},{"categoria":"Poblaciones y Villas","nombre":"Villa Cordillera IV","direccion":"Colina centro","lat":-33.193,"lng":-70.6705,"estado":"referencial"},{"categoria":"Poblaciones y Villas","nombre":"Villa San Antonio de Comaico","direccion":"Sector Comaico","lat":-33.204,"lng":-70.681,"estado":"referencial"},{"categoria":"Poblaciones y Villas","nombre":"Población Diego Portales","direccion":"Colina centro","lat":-33.201,"lng":-70.678,"estado":"referencial"},{"categoria":"Poblaciones y Villas","nombre":"Villa Víctor Villarroel","direccion":"Colina centro","lat":-33.198,"lng":-70.677,"estado":"referencial"},{"categoria":"Poblaciones y Villas","nombre":"Población Manuel Rodríguez","direccion":"Colina centro","lat":-33.201,"lng":-70.671,"estado":"referencial"},{"categoria":"Poblaciones y Villas","nombre":"Villa Don Jaime","direccion":"Colina centro","lat":-33.198,"lng":-70.68,"estado":"referencial"},{"categoria":"Poblaciones y Villas","nombre":"Villa Arturo Prat","direccion":"Sector Esmeralda","lat":-33.1845,"lng":-70.6555,"estado":"referencial"},{"categoria":"Poblaciones y Villas","nombre":"Villa Santa María de Esmeralda","direccion":"Sector Esmeralda","lat":-33.1815,"lng":-70.655,"estado":"referencial"},{"categoria":"Poblaciones y Villas","nombre":"Población San José de San Martín","direccion":"Sector San Martín","lat":-33.188,"lng":-70.656,"estado":"referencial"},{"categoria":"Poblaciones y Villas","nombre":"Población Santa Gemita de San Martín","direccion":"Sector San Martín","lat":-33.189,"lng":-70.657,"estado":"referencial"},{"categoria":"Poblaciones y Villas","nombre":"Población Los Pinares","direccion":"Sector urbano norte","lat":-33.1855,"lng":-70.662,"estado":"referencial"},{"categoria":"Poblaciones y Villas","nombre":"Población El Canelo","direccion":"Sector Chacabuco / rural","lat":-33.095,"lng":-70.69,"estado":"referencial"},{"categoria":"Poblaciones y Villas","nombre":"Villa Chacabuco","direccion":"Sector Chacabuco","lat":-33.15,"lng":-70.68,"estado":"referencial"},{"categoria":"Poblaciones y Villas","nombre":"Villa Peldehue","direccion":"Sector Peldehue","lat":-33.16,"lng":-70.64,"estado":"referencial"},{"categoria":"Poblaciones y Villas","nombre":"Población Santa María de la Copa","direccion":"Sector Liray","lat":-33.228,"lng":-70.704,"estado":"referencial"},{"categoria":"Poblaciones y Villas","nombre":"Villa Militar N.º 1","direccion":"Sector Peldehue / norte comunal","lat":-33.155,"lng":-70.65,"estado":"referencial"},{"categoria":"Poblaciones y Villas","nombre":"Villa Militar N.º 2","direccion":"Sector Peldehue / norte comunal","lat":-33.1535,"lng":-70.651,"estado":"referencial"},{"categoria":"Poblaciones y Villas","nombre":"Villa Santa Teresa","direccion":"Sector urbano","lat":-33.207,"lng":-70.674,"estado":"referencial"},{"categoria":"Poblaciones y Villas","nombre":"Población Los Aromos","direccion":"Sector urbano","lat":-33.193,"lng":-70.666,"estado":"referencial"},{"categoria":"Poblaciones y Villas","nombre":"Población Los Álamos II","direccion":"Sector urbano","lat":-33.1915,"lng":-70.668,"estado":"referencial"},{"categoria":"Poblaciones y Villas","nombre":"Condominio Reina Sur","direccion":"Sector Reina Sur","lat":-33.1885,"lng":-70.676,"estado":"referencial"},{"categoria":"Poblaciones y Villas","nombre":"Condominio Jardines de la Reina","direccion":"Sector Reina Sur","lat":-33.1875,"lng":-70.6755,"estado":"referencial"},{"categoria":"Poblaciones y Villas","nombre":"Condominio Los Olivos","direccion":"Sector Reina Sur","lat":-33.189,"lng":-70.677,"estado":"referencial"},{"categoria":"Poblaciones y Villas","nombre":"Condominio Las Mercedes","direccion":"Sector urbano","lat":-33.211,"lng":-70.69,"estado":"referencial"},{"categoria":"Poblaciones y Villas","nombre":"Condominio Portezuelo","direccion":"Sector Liray","lat":-33.224,"lng":-70.704,"estado":"referencial"},{"categoria":"Poblaciones y Villas","nombre":"Condominio Santa Elena","direccion":"Sector Santa Elena","lat":-33.335,"lng":-70.67,"estado":"referencial"},{"categoria":"Poblaciones y Villas","nombre":"Sector Santa Ester","direccion":"Sector rural sur","lat":-33.3,"lng":-70.69,"estado":"referencial"},{"categoria":"Poblaciones y Villas","nombre":"Sector Las Garzas I y III","direccion":"Sector rural sur","lat":-33.295,"lng":-70.7,"estado":"referencial"},{"categoria":"Poblaciones y Villas","nombre":"Sector Las Garzas II","direccion":"Sector rural sur","lat":-33.297,"lng":-70.698,"estado":"referencial"},{"categoria":"Poblaciones y Villas","nombre":"Sector El Olivar","direccion":"Sector rural sur","lat":-33.305,"lng":-70.7,"estado":"referencial"},{"categoria":"Iglesias","nombre":"Parroquia Inmaculada Concepción","direccion":"Colina Centro","lat":-33.206398,"lng":-70.676712,"estado":"ok"},{"categoria":"Iglesias","nombre":"Parroquia Sagrado Corazón de Jesús de Esmeralda","direccion":"Sector Esmeralda, Colina","lat":-33.180752,"lng":-70.657757,"estado":"ok"},{"categoria":"Iglesias","nombre":"Iglesia Simple Church","direccion":"Colina Centro / Sector Urbano","lat":-33.203565,"lng":-70.679441,"estado":"ok"},{"categoria":"Iglesias","nombre":"Capilla San Francisco de Asís","direccion":"Sector Urbano Colina","lat":-33.196132,"lng":-70.668197,"estado":"ok"},{"categoria":"Iglesias","nombre":"IMP Colina","direccion":"Sector Urbano Colina","lat":-33.197368,"lng":-70.674568,"estado":"ok"},{"categoria":"Iglesias","nombre":"Iglesia de Dios Colina","direccion":"Sector Urbano Colina","lat":-33.205587,"lng":-70.681695,"estado":"ok"},{"categoria":"Iglesias","nombre":"Iglesia Pentecostal de Chile","direccion":"Sector Urbano Colina","lat":-33.203603,"lng":-70.669857,"estado":"ok"},{"categoria":"Iglesias","nombre":"Iglesia Siervos de Cristo","direccion":"Sector Urbano Colina","lat":-33.203609,"lng":-70.667493,"estado":"ok"},{"categoria":"Iglesias","nombre":"Iglesia Mires Colina","direccion":"Sector Urbano Colina","lat":-33.199415,"lng":-70.663467,"estado":"ok"},{"categoria":"Iglesias","nombre":"Iglesia MCCI Colina","direccion":"Sector Poniente / Colina","lat":-33.201551,"lng":-70.701676,"estado":"ok"},{"categoria":"Iglesias","nombre":"La Iglesia de Jesucristo de los Santos de los Últimos Días","direccion":"Av. Concepción 550, Colina","lat":-33.20482,"lng":-70.67821,"estado":"ok"},{"categoria":"Comercio","nombre":"Shell Gral. San Martín","direccion":"Av. General San Martín, Colina","lat":-33.211707,"lng":-70.681362,"estado":"ok"},{"categoria":"Comercio","nombre":"Copec Gral. San Martín","direccion":"Av. General San Martín, Colina","lat":-33.201367,"lng":-70.673388,"estado":"ok"},{"categoria":"Comercio","nombre":"Shell Esmeralda","direccion":"Sector Esmeralda, Colina","lat":-33.18207,"lng":-70.650141,"estado":"ok"},{"categoria":"Comercio","nombre":"Copec Carretera Antigua (Liray)","direccion":"Liray, Colina","lat":-33.214965,"lng":-70.685107,"estado":"ok"},{"categoria":"Comercio","nombre":"Gas Río Puelo","direccion":"Colina Centro","lat":-33.206735,"lng":-70.67767,"estado":"ok"},{"categoria":"Comercio","nombre":"Aramco Caletera Oriente","direccion":"Caletera Ruta 5 / Colina","lat":-33.207459,"lng":-70.666522,"estado":"ok"},{"categoria":"Comercio","nombre":"Copec Colina Ruta 5","direccion":"Ruta 5 Norte, Colina","lat":-33.216335,"lng":-70.67672,"estado":"ok"},{"categoria":"Comercio","nombre":"Shell Av. del Valle (Chicureo)","direccion":"Chicureo, Colina","lat":-33.303511,"lng":-70.696941,"estado":"ok"},{"categoria":"Comercio","nombre":"Shell Algarrobal","direccion":"El Algarrobal, Colina","lat":-33.278687,"lng":-70.703588,"estado":"ok"},{"categoria":"Comercio","nombre":"Pan Colina","direccion":"Colina Centro","lat":-33.204416,"lng":-70.675724,"estado":"ok"},{"categoria":"Comercio","nombre":"Amasando Delicias Colina","direccion":"Sector Urbano Colina","lat":-33.192104,"lng":-70.680976,"estado":"ok"},{"categoria":"Comercio","nombre":"Dulcería Norma","direccion":"Sector Urbano Colina","lat":-33.193055,"lng":-70.674815,"estado":"ok"},{"categoria":"Comercio","nombre":"Panificadora Santa Teresa","direccion":"Sector Urbano Colina","lat":-33.191652,"lng":-70.664528,"estado":"ok"},{"categoria":"Comercio","nombre":"Panificadora Esmeralda","direccion":"Sector Esmeralda, Colina","lat":-33.181649,"lng":-70.652366,"estado":"ok"},{"categoria":"Comercio","nombre":"Panadería Géminis","direccion":"Sector Urbano Colina","lat":-33.195826,"lng":-70.675289,"estado":"ok"},{"categoria":"Comercio","nombre":"Amasandería El Rey","direccion":"Sector Urbano Colina","lat":-33.199828,"lng":-70.68028,"estado":"ok"},{"categoria":"Comercio","nombre":"La Casa Dulce","direccion":"Sector Urbano Colina","lat":-33.209796,"lng":-70.689407,"estado":"ok"},{"categoria":"Comercio","nombre":"Donde la Mami Ana","direccion":"Sector Urbano Colina","lat":-33.192699,"lng":-70.674432,"estado":"ok"},{"categoria":"Comercio","nombre":"Panadería Palomino","direccion":"Sector Urbano Colina","lat":-33.208726,"lng":-70.674442,"estado":"ok"},{"categoria":"Transporte","nombre":"OK BUSES","direccion":"Terminal Colina / Av. San Martín","lat":-33.19051,"lng":-70.6612,"estado":"ok"},{"categoria":"Transporte","nombre":"Terminal de Buses DAMIR","direccion":"Caletera Ote. Gral. San Martín, Colina","lat":-33.190241,"lng":-70.660963,"estado":"ok"},{"categoria":"Comercio","nombre":"Ciber y bazar TsT","direccion":"Av. Fontt 120, Colina Centro","lat":-33.20281,"lng":-70.67512,"estado":"ok"},{"categoria":"Transporte","nombre":"Colectivo Esmeralda Línea 8017","direccion":"Sector Esmeralda, Colina","lat":-33.185,"lng":-70.6538,"estado":"ok"},{"categoria":"Salud","nombre":"CESFAM Colina","direccion":"Av. Colina, Centro","lat":-33.206561,"lng":-70.670772,"estado":"ok"},{"categoria":"Salud","nombre":"CESFAM La Reina","direccion":"Sector La Reina, Colina","lat":-33.189036,"lng":-70.674969,"estado":"ok"},{"categoria":"Salud","nombre":"Centro de Salud Familiar Esmeralda","direccion":"Carretera General San Martín, Paradero 42","lat":-33.184128,"lng":-70.65358,"estado":"ok"},{"categoria":"Salud","nombre":"SAPU Esmeralda","direccion":"Carretera General San Martín, Paradero 42","lat":-33.184455,"lng":-70.653171,"estado":"ok"},{"categoria":"Salud","nombre":"SPA Esmeralda","direccion":"Av. General San Martín, Sector Esmeralda","lat":-33.1845,"lng":-70.6538,"estado":"ok"},{"categoria":"Salud","nombre":"SPA San Miguel","direccion":"Sector San Miguel, Colina","lat":-33.208211,"lng":-70.684851,"estado":"ok"},{"categoria":"Salud","nombre":"SAR Servicio de Urgencia de Colina","direccion":"Av. Aconcagua 200, Colina","lat":-33.20632,"lng":-70.67085,"estado":"ok"},{"categoria":"Salud","nombre":"COSAM Colina","direccion":"C. la Barca 0269, Colina","lat":-33.19694,"lng":-70.67468,"estado":"ok"},{"categoria":"Salud","nombre":"Farmacia Comunal Colina","direccion":"Av. Concepción 0110, Colina","lat":-33.20512,"lng":-70.68385,"estado":"ok"},{"categoria":"Salud","nombre":"Farmacia Comunal Esmeralda","direccion":"Sector Esmeralda","lat":-33.18411,"lng":-70.65327,"estado":"ok"},{"categoria":"Salud","nombre":"Clínica Dental Escolar de Colina","direccion":"Aconcagua 121, Colina","lat":-33.20594,"lng":-70.67153,"estado":"ok"},{"categoria":"Salud","nombre":"Posta de Salud Rural El Colorado","direccion":"El Colorado, Colina","lat":-33.074363,"lng":-70.717558,"estado":"ok"},{"categoria":"Salud","nombre":"Posta de Salud Rural Chacabuco","direccion":"Sector Chacabuco, Colina","lat":-33.16985,"lng":-70.63015,"estado":"ok"},{"categoria":"Salud","nombre":"Posta de Salud Rural Santa Marta de Liray","direccion":"Santa Marta de Liray, Colina","lat":-33.240166,"lng":-70.735928,"estado":"ok"},{"categoria":"Salud","nombre":"Posta de Salud Rural Las Canteras","direccion":"Las Canteras, Colina","lat":-33.304278,"lng":-70.689088,"estado":"ok"},{"categoria":"Salud","nombre":"Cecosf Colina","direccion":"Oro Olímpico, Sector La Reina, Colina","lat":-33.184869,"lng":-70.663752,"estado":"ok"},{"categoria":"Salud","nombre":"Samu 25, Colina","direccion":"Alpatacal s/n (Junto a CESFAM Colina)","lat":-33.20621,"lng":-70.67053,"estado":"ok"},{"categoria":"Salud","nombre":"Oficina Provincial de la SEREMI de Salud","direccion":"Carretera Gral. San Martín 253, Colina","lat":-33.20301,"lng":-70.67482,"estado":"ok"},{"categoria":"Salud","nombre":"Higiene Ambiental y Zoonosis","direccion":"Av. Concepción 398, Colina","lat":-33.20531,"lng":-70.68202,"estado":"ok"},{"categoria":"Educación","nombre":"Liceo Polivalente Rigoberto Fontt","direccion":"Sector Urbano Colina","lat":-33.19519,"lng":-70.674769,"estado":"ok"},{"categoria":"Educación","nombre":"Liceo Bicentenario Chacabuco","direccion":"Sector Urbano Colina","lat":-33.200367,"lng":-70.678748,"estado":"ok"},{"categoria":"Educación","nombre":"Instituto San Miguel","direccion":"Sector Urbano Colina","lat":-33.210372,"lng":-70.695115,"estado":"ok"},{"categoria":"Educación","nombre":"Liceo Humberto Díaz Casanueva","direccion":"Sector Urbano Colina","lat":-33.197052,"lng":-70.670049,"estado":"ok"},{"categoria":"Educación","nombre":"Polivalente Sembrador","direccion":"Sector Urbano Colina","lat":-33.203934,"lng":-70.672714,"estado":"ok"},{"categoria":"Educación","nombre":"Polivalente San Andrés","direccion":"Sector Urbano Colina","lat":-33.202278,"lng":-70.679886,"estado":"ok"},{"categoria":"Educación","nombre":"Colegio Desirée","direccion":"Sector Urbano Colina","lat":-33.202123,"lng":-70.678388,"estado":"ok"},{"categoria":"Educación","nombre":"Escuela Inmaculada Concepción","direccion":"Sector Urbano Colina","lat":-33.205168,"lng":-70.67832,"estado":"ok"},{"categoria":"Educación","nombre":"Complejo Educacional Rigoberto Fontt","direccion":"Sector Urbano Colina","lat":-33.195131,"lng":-70.674814,"estado":"ok"},{"categoria":"Educación","nombre":"Saint Mary School","direccion":"Sector Urbano Colina","lat":-33.204699,"lng":-70.674501,"estado":"ok"},{"categoria":"Educación","nombre":"Colegio Terramonte","direccion":"Sector Nororiente Colina","lat":-33.179507,"lng":-70.661525,"estado":"ok"},{"categoria":"Educación","nombre":"Colegio San Pedro de Colina","direccion":"Sector Urbano Colina","lat":-33.194366,"lng":-70.678047,"estado":"ok"},{"categoria":"Educación","nombre":"Colegio Reina Norte","direccion":"Sector Urbano Colina","lat":-33.183312,"lng":-70.67698,"estado":"ok"},{"categoria":"Educación","nombre":"Colegio Premio Nobel Pablo Neruda","direccion":"Sector Urbano Colina","lat":-33.19559,"lng":-70.673945,"estado":"ok"},{"categoria":"Educación","nombre":"Liceo Esmeralda","direccion":"Av. General San Martín, Sector Esmeralda","lat":-33.1861,"lng":-70.6556,"estado":"ok"},{"categoria":"Educación","nombre":"Escuela Nuestro Horizonte","direccion":"Camino Alba 2, Colina","lat":-33.2215,"lng":-70.6912,"estado":"ok"},{"categoria":"Educación","nombre":"Escuela Básica Valle Verde de Colina","direccion":"Población Valle Verde, Colina","lat":-33.19805,"lng":-70.66265,"estado":"ok"},{"categoria":"Educación","nombre":"Jardin Infantil Los Tres Ositos","direccion":"Esmeralda, Colina","lat":-33.18181,"lng":-70.650618,"estado":"ok"},{"categoria":"Educación","nombre":"COLEGIO ABERSAN","direccion":"Gral. San Martín 080, Colina","lat":-33.2012,"lng":-70.6738,"estado":"ok"},{"categoria":"Municipal","nombre":"Municipalidad de Colina","direccion":"Avenida Concepción, Colina","lat":-33.20506,"lng":-70.68404,"estado":"ok"},{"categoria":"Municipal","nombre":"Corporación Municipal de Colina (Salud, Edu y Desarrollos)","direccion":"Avenida Concepción 0110, Colina","lat":-33.2051,"lng":-70.6839,"estado":"ok"},{"categoria":"Municipal","nombre":"Corporación Municipal de Deportes de Colina","direccion":"Sector Urbano Colina","lat":-33.20425,"lng":-70.683808,"estado":"ok"},{"categoria":"Municipal","nombre":"Corporación de Educación de Colina","direccion":"Sector Urbano Colina","lat":-33.205881,"lng":-70.673789,"estado":"ok"},{"categoria":"Municipal","nombre":"Biblioteca Municipal 32 de Colina","direccion":"Sector Urbano Colina","lat":-33.206098,"lng":-70.673965,"estado":"ok"},{"categoria":"Municipal","nombre":"Centro Cultural de Colina (Unidad Municipal Cultural)","direccion":"Centro Cultural de Colina","lat":-33.203601,"lng":-70.679322,"estado":"ok"},{"categoria":"Municipal","nombre":"Espacio Mujer","direccion":"Sector Urbano Colina","lat":-33.201763,"lng":-70.674823,"estado":"ok"},{"categoria":"Municipal","nombre":"Centro de la Mujer","direccion":"El Litre #395, Colina","lat":-33.202882,"lng":-70.678625,"estado":"ok"},{"categoria":"Municipal","nombre":"Departamento Municipal de Personas Mayores","direccion":"Municipalidad de Colina","lat":-33.205055,"lng":-70.684004,"estado":"ok"},{"categoria":"Municipal","nombre":"Departamento Adulto Mayor Gobernación","direccion":"Gobernación Provincial de Chacabuco","lat":-33.202721,"lng":-70.674355,"estado":"ok"},{"categoria":"Municipal","nombre":"OMIL Colina","direccion":"Municipalidad de Colina","lat":-33.204929,"lng":-70.683813,"estado":"ok"},{"categoria":"Municipal","nombre":"Centro de Emprendimiento Colina","direccion":"Sector Urbano Colina","lat":-33.213797,"lng":-70.682299,"estado":"ok"},{"categoria":"Municipal","nombre":"SERCOTEC","direccion":"Sector Urbano Colina","lat":-33.201773,"lng":-70.675713,"estado":"ok"},{"categoria":"Municipal","nombre":"Oficina de Gobernanza y Medio Ambiente","direccion":"Municipalidad de Colina","lat":-33.205021,"lng":-70.684297,"estado":"ok"},{"categoria":"Municipal","nombre":"Centro de Día Mis Mejores Años","direccion":"Sector Urbano Colina","lat":-33.209511,"lng":-70.664307,"estado":"ok"},{"categoria":"Municipal","nombre":"Casa de la Discapacidad","direccion":"Sector Urbano Colina","lat":-33.200497,"lng":-70.666764,"estado":"ok"},{"categoria":"Municipal","nombre":"Programa Vínculos","direccion":"Municipalidad de Colina","lat":-33.204995,"lng":-70.683825,"estado":"ok"},{"categoria":"Municipal","nombre":"Departamento de Comunicaciones","direccion":"Sector Urbano Colina","lat":-33.203564,"lng":-70.679395,"estado":"ok"},{"categoria":"Municipal","nombre":"Centro de Estimulación y Desarrollo Integral","direccion":"Aconcagua 121, Colina","lat":-33.206,"lng":-70.671,"estado":"ok"},{"categoria":"Municipal","nombre":"Condominio de Viviendas Tuteladas I","direccion":"Sector Urbano Colina","lat":-33.191787,"lng":-70.669686,"estado":"ok"},{"categoria":"Municipal","nombre":"Condominio de Viviendas Tuteladas II","direccion":"Sector Urbano Colina","lat":-33.18837,"lng":-70.662812,"estado":"ok"},{"categoria":"Seguridad","nombre":"8va. Comisaría de Carabineros","direccion":"Concepción 575, Colina","lat":-33.204754,"lng":-70.67664,"estado":"ok"},{"categoria":"Seguridad","nombre":"Cuerpo de Bomberos Colina-Lampa","direccion":"General San Martín 225, Colina","lat":-33.2035,"lng":-70.6742,"estado":"ok"},{"categoria":"Seguridad","nombre":"Quinta Compañía Bomba Esmeralda (Bomberos)","direccion":"Av. Esmeralda 1200, Sector Esmeralda","lat":-33.1835,"lng":-70.654,"estado":"ok"},{"categoria":"Seguridad","nombre":"Cruz Roja Chilena Filial Esmeralda","direccion":"Calle Esmeralda #640, Colina","lat":-33.180887,"lng":-70.653559,"estado":"ok"},{"categoria":"Seguridad","nombre":"Centro Comunitario de Seguridad","direccion":"Av. Concepción 575, Colina","lat":-33.2048,"lng":-70.6765,"estado":"ok"},{"categoria":"Servicios","nombre":"Servicio De Registro Civil e Identificación Colina","direccion":"Avenida Concepción, Colina","lat":-33.20519,"lng":-70.68404,"estado":"ok"},{"categoria":"Servicios","nombre":"Sename","direccion":"Av. Concepción 0110, Colina","lat":-33.2052,"lng":-70.6835,"estado":"ok"},{"categoria":"Servicios","nombre":"SENDA","direccion":"Sector Urbano Colina","lat":-33.198934,"lng":-70.680721,"estado":"ok"},{"categoria":"Servicios","nombre":"Enel Colina","direccion":"Sector Urbano Colina","lat":-33.201593,"lng":-70.67435,"estado":"ok"},{"categoria":"Plazas","nombre":"Plaza de Armas de Colina","direccion":"Av. Fontt 190, Colina","lat":-33.202572,"lng":-70.67466,"estado":"ok"},{"categoria":"Plazas","nombre":"Plaza Esmeralda","direccion":"Av. Esmeralda, Sector Esmeralda","lat":-33.1848,"lng":-70.6548,"estado":"ok"},{"categoria":"Plazas","nombre":"Plazuela Arturo Prath Chacón","direccion":"Av. Fontt / Colina Centro","lat":-33.2026,"lng":-70.6749,"estado":"ok"},{"categoria":"Plazas","nombre":"Plaza Colina I y II","direccion":"Población Colina I y II","lat":-33.1975,"lng":-70.6712,"estado":"ok"},{"categoria":"Plazas","nombre":"Plaza Villa San Andrés","direccion":"Villa San Andrés, Colina","lat":-33.2021,"lng":-70.6795,"estado":"ok"},{"categoria":"Plazas","nombre":"Parque Claudio Arrau II","direccion":"Villa Claudio Arrau, Colina","lat":-33.1942,"lng":-70.6691,"estado":"ok"},{"categoria":"Plazas","nombre":"Cancha Rigoberto Fontt","direccion":"Sector Rigoberto Fontt, Colina","lat":-33.1955,"lng":-70.675,"estado":"ok"},{"categoria":"Plazas","nombre":"CANCHA OHIGGINS COLINA","direccion":"Población O'Higgins, Colina","lat":-33.1822,"lng":-70.6485,"estado":"ok"},{"categoria":"Restaurantes","nombre":"EL REY DEL CHURRASCON","direccion":"Av. San Martín / Colina Centro","lat":-33.2038,"lng":-70.6745,"estado":"ok"},{"categoria":"Restaurantes","nombre":"El Glotón de Esmeralda","direccion":"Sector Esmeralda, Colina","lat":-33.1842,"lng":-70.655,"estado":"ok"},{"categoria":"Restaurantes","nombre":"La picá de Don Miguel","direccion":"Sector Esmeralda, Colina","lat":-33.184,"lng":-70.6545,"estado":"ok"},{"categoria":"Restaurantes","nombre":"La Picá De Esmeralda","direccion":"Sector Esmeralda, Colina","lat":-33.1838,"lng":-70.6548,"estado":"ok"},{"categoria":"Restaurantes","nombre":"TERRAZA DE ESMERALDA (TENEDOR LIBRE) BY BIGMATIGRILL","direccion":"Sector Esmeralda, Colina","lat":-33.1833,"lng":-70.6548,"estado":"ok"},{"categoria":"Organizaciones","nombre":"Agrupación de Baile Colina Adultos Mayores","direccion":"Sede Social Ignacio Carrera Pinto","lat":-33.195395,"lng":-70.674224,"estado":"ok"},{"categoria":"Organizaciones","nombre":"Club de adulto mayor San Valentín","direccion":"Sede Social JJVV Esmeralda","lat":-33.184125,"lng":-70.648745,"estado":"ok"},{"categoria":"Organizaciones","nombre":"Club de adulto mayor Nuestra sra De Pompeya","direccion":"Calle La Copa S/N, El Colorado","lat":-33.073287,"lng":-70.717698,"estado":"ok"},{"categoria":"Organizaciones","nombre":"Club de Adulto Mayor Las Golondrinas","direccion":"Los Almendros #107, Esmeralda","lat":-33.181535,"lng":-70.647862,"estado":"ok"},{"categoria":"Organizaciones","nombre":"Club de Adulto mayor Las Nonitas","direccion":"Sede Social Portal Andino","lat":-33.19171,"lng":-70.664928,"estado":"ok"},{"categoria":"Organizaciones","nombre":"Club de Adulto Mayor San Sebastián","direccion":"Sede Social Ignacio Carrera Pinto","lat":-33.195342,"lng":-70.674426,"estado":"ok"},{"categoria":"Organizaciones","nombre":"Club de Adulto Mayor Nuevo Milenio","direccion":"Sede Social Las Américas","lat":-33.19197,"lng":-70.668395,"estado":"ok"},{"categoria":"Organizaciones","nombre":"Club de Adulto Mayor el Hacedor","direccion":"Sede Social Glorias Navales","lat":-33.184879,"lng":-70.65234,"estado":"ok"},{"categoria":"Organizaciones","nombre":"Club de Adulto Mayor Nueva Esperanza","direccion":"Sede Social Ignacio Carrera Pinto","lat":-33.195331,"lng":-70.674324,"estado":"ok"},{"categoria":"Organizaciones","nombre":"Club de Adulto Mayor La Cordillera","direccion":"Sede Social Ignacio Carrera Pinto","lat":-33.195384,"lng":-70.674299,"estado":"ok"},{"categoria":"Organizaciones","nombre":"Club de Adulto Mayor La Espigadora","direccion":"Sede CESFAM Esmeralda","lat":-33.183829,"lng":-70.65349,"estado":"ok"},{"categoria":"Organizaciones","nombre":"Club de Adulto Mayor Amistad y Alegría","direccion":"Cruz Roja filial Esmeralda","lat":-33.180799,"lng":-70.6536,"estado":"ok"},{"categoria":"Organizaciones","nombre":"Club de Tango La Vida es un Tango","direccion":"Colegio Premio Nobel Pablo Neruda","lat":-33.19598,"lng":-70.674084,"estado":"ok"},{"categoria":"Organizaciones","nombre":"Club de Adulto Mayor Nuevo Renacer","direccion":"Sede social José Fuentes Guerra","lat":-33.190785,"lng":-70.66612,"estado":"ok"},{"categoria":"Organizaciones","nombre":"Club de Adulto Mayor El Esfuerzo Centenario II","direccion":"Sede Social Centenario II","lat":-33.187588,"lng":-70.66367,"estado":"ok"},{"categoria":"Organizaciones","nombre":"Agrupación de Adulto Mayor el Colorado","direccion":"Pasaje Los Hidalgos, El Colorado","lat":-33.073244,"lng":-70.719048,"estado":"ok"},{"categoria":"Organizaciones","nombre":"Club de Adulto Mayor San Isidro","direccion":"Calle Esmeralda 3103","lat":-33.181742,"lng":-70.675231,"estado":"ok"},{"categoria":"Organizaciones","nombre":"Club de Adulto Mayor San Alberto de Sicilia","direccion":"Sede Social Claudio Arrau","lat":-33.194386,"lng":-70.669462,"estado":"ok"},{"categoria":"Organizaciones","nombre":"Club de Adulto Mayor Alma Joven","direccion":"Sede Social Ignacio Carrera Pinto","lat":-33.195375,"lng":-70.674372,"estado":"ok"},{"categoria":"Organizaciones","nombre":"Club de Adulto Mayor Siglo XXI","direccion":"Felipe II #480, Las Américas","lat":-33.192183,"lng":-70.669831,"estado":"ok"},{"categoria":"Organizaciones","nombre":"Club de Adulto Mayor Ave Fénix","direccion":"Sede Social Oro Olímpico","lat":-33.184719,"lng":-70.663902,"estado":"ok"},{"categoria":"Organizaciones","nombre":"Club de Adulto Mayor Caminando Juntos","direccion":"Lo seco #510","lat":-33.191782,"lng":-70.669606,"estado":"ok"},{"categoria":"Organizaciones","nombre":"Club de Adulto Mayor Sargento Candelaria","direccion":"Los Almendros #115, Villa Ohiggins","lat":-33.18159,"lng":-70.647817,"estado":"ok"},{"categoria":"Organizaciones","nombre":"Club de Adulto Mayor San Isidro Labrador","direccion":"Sede social Villa San Isidro","lat":-33.194783,"lng":-70.671565,"estado":"ok"},{"categoria":"Organizaciones","nombre":"Club de Adulto Mayor Manos Unidas","direccion":"Cruz Roja Filial Esmeralda","lat":-33.180737,"lng":-70.653709,"estado":"ok"}];
+
+(function aplicarCorrecciones(){
+  Object.keys(corr).forEach(orig => {
+    const c = corr[orig];
+    let s = servicios.find(x => x.nombre === orig);
+    if (!s && c.nuevoNombre && c.nuevoNombre !== orig) s = servicios.find(x => x.nombre === c.nuevoNombre);
+    if (s) {
+      if (c.nuevoNombre) s.nombre = c.nuevoNombre;
+      if (c.direccion !== undefined) s.direccion = c.direccion;
+      if (c.telefono !== undefined) s.telefono = c.telefono;
+      if (c.lat != null && c.lng != null) { s.lat = c.lat; s.lng = c.lng; }
+      s.estado = 'ok';
+    }
+  });
+  nuevos.forEach(h => {
+    if (!servicios.find(s => s.nombre === h.nombre))
+      servicios.push({categoria:h.categoria||"Hitos Nuevos", nombre:h.nombre, direccion:h.direccion||"Agregado manualmente", telefono:h.telefono||"", lat:h.lat, lng:h.lng, estado:"ok"});
+  });
+  elim.forEach(n => { const i = servicios.findIndex(s => s.nombre === n); if (i !== -1) servicios.splice(i,1); });
+})();
+
+/* ================= Utilidades ================= */
+function esc(v){ return String(v==null?'':v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;'); }
+const norm = s => String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+const esMovil = () => window.matchMedia('(max-width: 899px)').matches;
+const tieneCoords = s => s && s.lat != null && s.lng != null && !isNaN(s.lat) && !isNaN(s.lng);
+const esAdmin = () => document.body.classList.contains('admin');
+function textoBusqueda(s){ return norm([s.nombre, s.categoria, s.direccion, infoCat(s.categoria).s].join(' ')); }
+
+let avisoTimer = null;
+function aviso(msg, modo){
+  const a = $('aviso'); a.textContent = msg; a.className = 'aviso' + (modo ? ' modo' : ''); a.hidden = false;
+  clearTimeout(avisoTimer);
+  if (!modo) avisoTimer = setTimeout(() => { a.hidden = true; }, 4500);
+}
+function ocultarAviso(){ $('aviso').hidden = true; }
+
+/* ================= Mapa ================= */
+const map = L.map('mapa', {zoomControl:false, tap:true}).setView([-33.19,-70.67], 13);
+map.attributionControl.setPrefix(false);
+L.tileLayer('https://mt{s}.google.com/vt/lyrs=m&hl=es&x={x}&y={y}&z={z}', {
+  subdomains:'0123', maxZoom:20, attribution:'Google Maps',
+  errorTileUrl:'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256"><rect width="256" height="256" fill="%23e5e3df"/></svg>'
+}).addTo(map);
+
+const capa = L.layerGroup().addTo(map);
+const marcadoresPorNombre = {};
+const poblacionesLayer = L.geoJSON(null, {
+  style: () => ({color:"#1565c0", weight:2, opacity:.9, fillColor:"#42a5f5", fillOpacity:.2}),
+  onEachFeature: (feature, layer) => {
+    layer.on('click', () => {
+      const nombre = ((feature.properties && feature.properties.Nombre) || 'Población / Villa').trim();
+      const c = layer.getBounds().getCenter();
+      L.DomEvent.stop;
+      seleccionar({nombre, categoria:CAT_POBL, direccion:'Población o villa de Colina', lat:c.lat, lng:c.lng, estado:'ok', esPoligono:true}, {centrar:false});
+    });
+  }
+});
+
+function iconoPin(cat, sel){
+  const c = colorCat(cat);
+  return L.divIcon({className:'pin'+(sel?' sel':''), html:`<span style="background:${c}">${infoCat(cat).e}</span>`, iconSize:[40,40], iconAnchor:[20,20]});
+}
+function crearMarcador(s){
+  if (!tieneCoords(s)) return null;
+  const m = L.marker([s.lat,s.lng], {icon:iconoPin(s.categoria,false), title:s.nombre, keyboard:true, riseOnHover:true});
+  m.on('click', () => seleccionar(s, {centrar:true}));
+  marcadoresPorNombre[s.nombre] = m;
+  return m;
+}
+servicios.forEach(crearMarcador);
+
+function actualizarZoomClase(){ $('mapa').classList.toggle('zoom-lejos', map.getZoom() < 15); }
+map.on('zoomend', actualizarZoomClase); actualizarZoomClase();
+window.addEventListener('resize', () => map.invalidateSize());
+
+$('zMas').onclick = () => map.zoomIn();
+$('zMenos').onclick = () => map.zoomOut();
+
+let marcaYo = null;
+$('btnYo').onclick = () => {
+  if (!navigator.geolocation) { aviso('Este aparato no permite buscar su ubicación.'); return; }
+  aviso('Buscando su ubicación…');
+  navigator.geolocation.getCurrentPosition(p => {
+    const ll = [p.coords.latitude, p.coords.longitude];
+    if (marcaYo) map.removeLayer(marcaYo);
+    marcaYo = L.marker(ll, {icon:L.divIcon({className:'yo', html:'<span>Usted está aquí</span>', iconSize:[0,0]}), interactive:false, zIndexOffset:2000}).addTo(map);
+    map.setView(ll, 16); aviso('Listo. Usted está en el punto azul.');
+  }, () => aviso('No pudimos encontrar su ubicación. Revise que la ubicación esté activada en su teléfono.'), {enableHighAccuracy:true, timeout:15000});
+};
+
+/* ---- Polígonos de poblaciones (servicio externo) ---- */
+(async function cargarPoblaciones(){
+  const st = $('poblacionStatus');
+  const url = "https://services3.arcgis.com/cTnMkBRk4HWkUCRo/ArcGIS/rest/services/Barrios/FeatureServer/0/query?where=" +
+    encodeURIComponent("Comuna='Colina'") + "&outFields=OBJECTID,Id,Comuna,Nombre,Año,Prefijo,sup_m,sup_ha,Pob17,viv17&returnGeometry=true&outSR=4326&f=geojson";
+  try {
+    const r = await fetch(url);
+    if (!r.ok) throw new Error('HTTP '+r.status);
+    const g = await r.json();
+    poblacionesLayer.addData(g);
+    st.textContent = (g.features ? g.features.length : 0) + ' polígonos de poblaciones cargados.';
+    sincronizarPoligonos();
+  } catch(e) { st.textContent = 'Polígonos de poblaciones no disponibles (sin conexión o servicio caído).'; }
+})();
+function sincronizarPoligonos(){
+  const quiere = estado.cat === CAT_POBL;
+  if (quiere && !map.hasLayer(poblacionesLayer)) poblacionesLayer.addTo(map);
+  if (!quiere && map.hasLayer(poblacionesLayer)) map.removeLayer(poblacionesLayer);
+}
+
+/* ================= Estado y vistas ================= */
+const estado = {cat:null, q:''};
+let seleccion = null;
+
+function filtrar(){
+  const tokens = norm(estado.q).split(/\s+/).filter(Boolean);
+  let l;
+  if (tokens.length) l = servicios.filter(s => { const h = textoBusqueda(s); return tokens.every(t => h.includes(t)); });
+  else if (estado.cat) l = servicios.filter(s => s.categoria === estado.cat);
+  else l = servicios.filter(s => s.categoria !== CAT_POBL);
+  return l.slice().sort((a,b) => a.nombre.localeCompare(b.nombre,'es'));
+}
+
+function categoriasOrdenadas(){
+  const presentes = Array.from(new Set(servicios.map(s => s.categoria)));
+  const extra = presentes.filter(c => !ORDEN.includes(c)).sort();
+  return [...ORDEN.filter(c => presentes.includes(c)), ...extra];
+}
+
+function renderTiles(){
+  const cont = $('tiles'); cont.innerHTML = '';
+  categoriasOrdenadas().forEach(cat => {
+    const n = servicios.filter(s => s.categoria === cat).length, i = infoCat(cat);
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'tile' + (cat === CAT_POBL ? ' ancho' : '');
+    b.style.setProperty('--c', colorCat(cat));
+    b.innerHTML = `<span class="ico" aria-hidden="true">${i.e}</span><span class="tx"><span class="nom">${esc(cat)}</span><span class="des">${esc(i.d)}</span><span class="num">${n} lugar${n===1?'':'es'}</span></span>`;
+    b.addEventListener('click', () => { estado.cat = cat; estado.q = ''; $('buscar').value = ''; actualizarVista(true); $('panelScroll').scrollTop = 0; });
+    cont.appendChild(b);
+  });
+}
+
+function renderLista(lista){
+  const cont = $('listaItems'); cont.innerHTML = '';
+  if (!lista.length) {
+    cont.innerHTML = '<div class="vacio"><b>No encontramos ningún lugar.</b><br>Pruebe con otra palabra, por ejemplo: <i>consultorio</i>, <i>bomberos</i> o <i>plaza</i>.</div>';
+    return;
+  }
+  lista.forEach(s => {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'item'; b.style.setProperty('--c', colorCat(s.categoria));
+    b.innerHTML = `<span class="ico" aria-hidden="true">${infoCat(s.categoria).e}</span><span class="tx"><span class="nom">${esc(s.nombre)}</span><span class="dir">${esc(s.direccion || 'Sin dirección')}</span></span><span class="fl" aria-hidden="true">›</span>`;
+    b.addEventListener('click', () => seleccionar(s, {centrar:true}));
+    cont.appendChild(b);
+  });
+}
+
+let ultimaLista = [];
+function actualizarVista(ajustar){
+  const hayFiltro = !!(estado.q.trim() || estado.cat);
+  $('panelInicio').hidden = hayFiltro;
+  $('panelLista').hidden = !hayFiltro;
+  $('btnBorrar').hidden = !estado.q.trim();
+  renderTiles();
+  const lista = filtrar(); ultimaLista = lista;
+  if (hayFiltro) {
+    if (estado.q.trim()) { $('listaTitulo').textContent = 'Resultados'; $('listaSub').textContent = `Usted buscó “${estado.q.trim()}”. ${lista.length} lugar${lista.length===1?'':'es'}.`; }
+    else { $('listaTitulo').textContent = infoCat(estado.cat).e + ' ' + estado.cat; $('listaSub').textContent = `${lista.length} lugar${lista.length===1?'':'es'}. Toque uno para verlo en el mapa.`; }
+    renderLista(lista);
+  }
+  // Chip sobre el mapa
+  const f = $('filtro');
+  f.hidden = !hayFiltro;
+  if (hayFiltro) $('filtroTxt').textContent = (estado.q.trim() ? `Búsqueda: “${estado.q.trim()}”` : estado.cat) + ` (${lista.length})`;
+  // Marcadores
+  capa.clearLayers();
+  lista.forEach(s => { const m = marcadoresPorNombre[s.nombre]; if (m) capa.addLayer(m); });
+  if (seleccion) { const m = marcadoresPorNombre[seleccion.nombre]; if (m && !capa.hasLayer(m)) capa.addLayer(m); }
+  sincronizarPoligonos();
+  if (ajustar) ajustarMapa(lista);
+}
+function ajustarMapa(lista){
+  const pts = lista.filter(tieneCoords).map(s => [s.lat,s.lng]);
+  if (!pts.length) return;
+  if (pts.length === 1) map.setView(pts[0], 16);
+  else map.fitBounds(L.latLngBounds(pts), {padding:[60,60], maxZoom:16});
+}
+function limpiarFiltro(){ estado.cat = null; estado.q = ''; $('buscar').value = ''; actualizarVista(true); }
+
+let deb = null;
+$('buscar').addEventListener('input', e => {
+  estado.q = e.target.value; if (estado.q.trim()) estado.cat = null;
+  clearTimeout(deb); deb = setTimeout(() => actualizarVista(true), 250);
+  $('btnBorrar').hidden = !estado.q.trim();
+  if (!estado.q.trim()) { actualizarVista(true); }
+});
+$('btnBorrar').onclick = () => { limpiarFiltro(); $('buscar').focus(); };
+$('btnInicio').onclick = limpiarFiltro;
+$('filtroQuitar').onclick = limpiarFiltro;
+
+function abrirPanel(){ $('panel').classList.add('abierto'); }
+function cerrarPanel(){ if (esMovil()) $('panel').classList.remove('abierto'); setTimeout(() => map.invalidateSize(), 50); }
+$('btnLista').onclick = abrirPanel;
+$('btnVerMapa').onclick = () => { cerrarPanel(); if (!seleccion) ajustarMapa(ultimaLista); };
+
+/* ================= Ficha ================= */
+function deseleccionarMarcador(){
+  if (seleccion) { const m = marcadoresPorNombre[seleccion.nombre]; if (m) { m.setIcon(iconoPin(seleccion.categoria,false)); m.setZIndexOffset(0); } }
+}
+function cerrarFicha(){
+  deseleccionarMarcador(); seleccion = null; $('ficha').hidden = true; $('ficha').innerHTML = '';
+}
+function seleccionar(item, opts){
+  opts = opts || {};
+  deseleccionarMarcador();
+  seleccion = item;
+  const m = marcadoresPorNombre[item.nombre];
+  if (m) { if (!capa.hasLayer(m)) capa.addLayer(m); m.setIcon(iconoPin(item.categoria,true)); m.setZIndexOffset(1000); }
+  renderFicha(item);
+  cerrarPanel();
+  if (opts.centrar !== false && tieneCoords(item)) setTimeout(() => centrarCon(item), 80);
+}
+function centrarCon(item){
+  const z = Math.max(map.getZoom(), 17);
+  const f = $('ficha');
+  const off = f.hidden ? 0 : Math.min(f.offsetHeight, map.getSize().y * 0.6) / 2;
+  const p = map.project([item.lat,item.lng], z); p.y += off;
+  map.setView(map.unproject(p, z), z, {animate:true});
+}
+
+function fila(i, titulo, html){ return `<div class="fila"><span class="i" aria-hidden="true">${i}</span><div class="t"><small>${titulo}</small><div>${html}</div></div></div>`; }
+
+function renderFicha(it){
+  const key = String(it.nombre).trim();
+  const color = colorCat(it.categoria);
+  const cesfam = asig[key];
+  const resena = (res[key] || '').trim();
+  const tel = (it.telefono || '').trim();
+  const aprox = it.estado === 'referencial' || it.categoria === CAT_POBL;
+  const claro = ['#f9ab00'].includes(color);
+  let h = `<div class="ficha-barra" style="background:${color}"></div><div class="ficha-cuerpo" style="--c:${color}">
+    <div class="ficha-top"><span class="chip${claro?' oscuro':''}">${infoCat(it.categoria).e} ${esc(it.categoria)}</span>
+    <button class="btn btn-sec btn-cerrar" type="button" data-accion="cerrar">✕ Cerrar</button></div>
+    <h2>${esc(it.nombre)}</h2>`;
+  if (it.direccion) h += fila('📍','Dirección', esc(it.direccion));
+  if (tel) h += fila('📞','Teléfono', esc(tel));
+  if (cesfam && cesfam !== 'No determinado') h += fila('🏥', it.categoria === CAT_POBL ? 'Su consultorio (CESFAM)' : 'CESFAM asociado', esc(cesfam));
+  if (resena) h += fila('ℹ️','Información', esc(resena).replace(/\n/g,'<br>'));
+  if (aprox) h += `<p class="nota">📌 La ubicación en el mapa es aproximada.</p>`;
+  h += '<div class="acciones">';
+  if (tieneCoords(it)) h += `<a class="btn btn-primario" target="_blank" rel="noopener" href="https://www.google.com/maps/dir/?api=1&destination=${it.lat},${it.lng}">🧭 Cómo llegar</a>`;
+  if (tel) h += `<a class="btn btn-llamar" href="tel:${esc(tel.replace(/[^\d+]/g,''))}">📞 Llamar</a>`;
+  h += `<button class="btn btn-sec solo-movil" type="button" data-accion="lista">☰ Volver a la lista</button></div>`;
+
+  // Edición (solo administrador)
+  const puedeUbicar = !it.esPoligono;
+  h += `<details class="edicion solo-admin"><summary>✏️ Editar este lugar</summary>
+    ${puedeUbicar ? `
+    <label for="ed_dir">Dirección</label><input id="ed_dir" value="${esc(it.direccion||'')}" placeholder="Ej: Av. San Martín 123">
+    <button class="btn btn-sec btn-ancho" type="button" data-accion="g-dir">💾 Guardar dirección</button>
+    <label for="ed_tel">Teléfono</label><input id="ed_tel" value="${esc(it.telefono||'')}" placeholder="Ej: +56 9 1234 5678">
+    <button class="btn btn-sec btn-ancho" type="button" data-accion="g-tel">💾 Guardar teléfono</button>` : ''}
+    <label for="ed_cesfam">CESFAM asignado</label>
+    <select id="ed_cesfam">${CESFAM_OPCIONES.map(o => `<option${o === (cesfam||'No determinado') ? ' selected' : ''}>${esc(o)}</option>`).join('')}</select>
+    <label for="ed_resena">Reseña / información</label><textarea id="ed_resena" placeholder="Escriba una nota…">${esc(res[key]||'')}</textarea>
+    <button class="btn btn-sec btn-ancho" type="button" data-accion="g-resena">💾 Guardar reseña</button>
+    ${puedeUbicar ? `
+    <label>Coordenadas</label><div class="par"><input id="ed_lat" type="number" step="0.000001" value="${it.lat==null?'':it.lat}" placeholder="Latitud"><input id="ed_lng" type="number" step="0.000001" value="${it.lng==null?'':it.lng}" placeholder="Longitud"></div>
+    <button class="btn btn-sec btn-ancho" type="button" data-accion="g-coords">💾 Guardar coordenadas</button>
+    <div class="fila-btns"><button class="btn btn-sec" type="button" data-accion="mover">📍 Mover en el mapa</button>
+    <button class="btn btn-sec" type="button" data-accion="imprimir">🖨️ Imprimir</button></div>
+    <button class="btn btn-peligro btn-ancho" type="button" data-accion="eliminar">🗑️ Eliminar este lugar</button>` : `
+    <button class="btn btn-sec btn-ancho" type="button" data-accion="imprimir">🖨️ Imprimir</button>`}
+  </details>`;
+  h += '</div>';
+  const f = $('ficha'); f.innerHTML = h; f.hidden = false; f.scrollTop = 0;
+}
+
+$('ficha').addEventListener('click', e => {
+  const b = e.target.closest('[data-accion]'); if (!b || !seleccion) return;
+  const a = b.dataset.accion;
+  if (a === 'cerrar') cerrarFicha();
+  else if (a === 'lista') abrirPanel();
+  else if (esAdmin()) accionAdmin(a);
+});
+$('ficha').addEventListener('change', e => {
+  if (e.target.id === 'ed_cesfam' && esAdmin() && seleccion) {
+    const a = cargarAsig(); a[String(seleccion.nombre).trim()] = e.target.value; escribir(K.asig, a); asig = a; refrescarTodo(false);
+    aviso('✅ CESFAM guardado.');
+  }
+});
+
+/* ================= Administración ================= */
+function refrescarTodo(reabrir){
+  const abierto = document.querySelector('#ficha details.edicion');
+  const estabaAbierto = abierto && abierto.open;
+  actualizarVista(false);
+  if (seleccion && !$('ficha').hidden) { renderFicha(seleccion); if (estabaAbierto) { const d = document.querySelector('#ficha details.edicion'); if (d) d.open = true; } }
+}
+function guardarCorreccion(nombre, campos){
+  const c = cargarCorr(); c[nombre] = Object.assign(c[nombre] || {}, campos); escribir(K.corr, c); corr = c;
+}
+function accionAdmin(a){
+  const s = seleccion, nombre = String(s.nombre).trim();
+  const srv = servicios.find(x => x.nombre === s.nombre);
+  if (a === 'g-dir') {
+    const v = $('ed_dir').value.trim(); guardarCorreccion(nombre, {direccion:v}); if (srv) srv.direccion = v;
+    refrescarTodo(); aviso('✅ Dirección guardada.');
+  } else if (a === 'g-tel') {
+    const v = $('ed_tel').value.trim(); guardarCorreccion(nombre, {telefono:v}); if (srv) srv.telefono = v;
+    refrescarTodo(); aviso('✅ Teléfono guardado.');
+  } else if (a === 'g-resena') {
+    const r = cargarRes(); r[nombre] = $('ed_resena').value; escribir(K.res, r); res = r;
+    refrescarTodo(); aviso('✅ Reseña guardada.');
+  } else if (a === 'g-coords') {
+    const la = parseFloat($('ed_lat').value), ln = parseFloat($('ed_lng').value);
+    if (isNaN(la) || isNaN(ln)) { alert('Escriba números válidos en latitud y longitud.'); return; }
+    guardarCorreccion(nombre, {lat:la, lng:ln});
+    if (srv) { srv.lat = la; srv.lng = ln; const m = marcadoresPorNombre[srv.nombre]; if (m) m.setLatLng([la,ln]); }
+    refrescarTodo(); aviso('✅ Coordenadas guardadas.');
+  } else if (a === 'mover') {
+    modoMapa = 'mover'; ocultarFichaTemporal();
+    aviso('Toque en el mapa el nuevo lugar de “' + s.nombre + '”. (Toque aquí para cancelar)', true);
+    map.getContainer().style.cursor = 'crosshair';
+  } else if (a === 'eliminar') {
+    if (!confirm('¿Seguro que desea eliminar “' + s.nombre + '”?')) return;
+    const e = cargarElim(); if (!e.includes(s.nombre)) e.push(s.nombre); escribir(K.elim, e); elim = e;
+    const hn = cargarNuevos().filter(h => h.nombre !== s.nombre); escribir(K.nuevos, hn); nuevos = hn;
+    const i = servicios.findIndex(x => x.nombre === s.nombre); if (i !== -1) servicios.splice(i,1);
+    const m = marcadoresPorNombre[s.nombre]; if (m) { capa.removeLayer(m); delete marcadoresPorNombre[s.nombre]; }
+    seleccion = null; $('ficha').hidden = true; $('ficha').innerHTML = '';
+    actualizarVista(false); aviso('🗑️ Lugar eliminado.');
+  } else if (a === 'imprimir') imprimirFicha(s);
+}
+function ocultarFichaTemporal(){ $('ficha').hidden = true; }
+
+function imprimirFicha(s){
+  const key = String(s.nombre).trim();
+  const w = window.open('', '_blank', 'width=600,height=500'); if (!w) { alert('El navegador bloqueó la ventana. Permita ventanas emergentes.'); return; }
+  w.document.write(`<html><head><title>${esc(s.nombre)}</title><style>body{font-family:Arial,sans-serif;padding:28px;color:#222;font-size:18px}h2{color:#0b57d0;border-bottom:3px solid #0b57d0;padding-bottom:8px}.r{margin-top:16px;padding:14px;background:#fffde7;border:1px solid #ffcc80;white-space:pre-wrap}</style></head><body>
+    <h2>${esc(s.nombre)}</h2><p><b>Dirección:</b> ${esc(s.direccion||'No registrada')}</p><p><b>Teléfono:</b> ${esc(s.telefono||'No registrado')}</p>
+    <p><b>CESFAM:</b> ${esc(asig[key]||'No determinado')}</p><div class="r">${esc(res[key]||'')}</div>
+    <script>window.onload=function(){window.print();window.close();}<\/script></body></html>`);
+  w.document.close();
+}
+
+let modoMapa = null;
+function salirModoMapa(){ modoMapa = null; map.getContainer().style.cursor = ''; ocultarAviso(); }
+$('aviso').addEventListener('click', () => { if (modoMapa) { salirModoMapa(); if (seleccion) $('ficha').hidden = false; } });
+
+map.on('click', e => {
+  if (!esAdmin() || !modoMapa) return;
+  const { lat, lng } = e.latlng;
+  if (modoMapa === 'mover' && seleccion) {
+    const nombre = String(seleccion.nombre).trim();
+    guardarCorreccion(nombre, {lat, lng});
+    const srv = servicios.find(x => x.nombre === seleccion.nombre); if (srv) { srv.lat = lat; srv.lng = lng; }
+    const m = marcadoresPorNombre[seleccion.nombre]; if (m) m.setLatLng([lat,lng]);
+    salirModoMapa(); $('ficha').hidden = false; refrescarTodo(); aviso('✅ Ubicación actualizada.');
+  } else if (modoMapa === 'agregar') {
+    salirModoMapa();
+    const nombre = prompt('Nombre del nuevo lugar:'); if (!nombre || !nombre.trim()) return;
+    const cats = categoriasOrdenadas().join(', ');
+    const cat = prompt('Categoría (' + cats + ') o una nueva:', 'Hitos Nuevos');
+    const dir = prompt('Dirección o descripción breve:', 'Ubicación personalizada');
+    const h = {categoria:(cat||'Hitos Nuevos').trim(), nombre:nombre.trim(), direccion:dir||'', telefono:'', lat, lng, estado:'ok'};
+    const hn = cargarNuevos(); hn.push(h); escribir(K.nuevos, hn); nuevos = hn;
+    servicios.push(h); crearMarcador(h); actualizarVista(false); seleccionar(h, {centrar:true});
+    aviso('✅ Lugar agregado.');
+  }
+});
+$('adAgregar').onclick = () => { modoMapa = 'agregar'; cerrarPanel(); aviso('Toque en el mapa donde va el nuevo lugar. (Toque aquí para cancelar)', true); map.getContainer().style.cursor = 'crosshair'; };
+
+function descargar(nombre, contenido, tipo){
+  const url = URL.createObjectURL(new Blob([contenido], {type:tipo}));
+  const a = document.createElement('a'); a.href = url; a.download = nombre; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 2000);
+}
+const datosActuales = () => ({cesfam:cargarAsig(), resenas:cargarRes(), correccionesHitos:cargarCorr(), hitosNuevos:cargarNuevos(), hitosEliminados:cargarElim()});
+const hoy = () => new Date().toISOString().slice(0,10);
+
+$('adExportar').onclick = () => descargar('Respaldo_Mapa_Colina_' + hoy() + '.json', JSON.stringify(Object.assign(datosActuales(), {exportado:new Date().toISOString()}), null, 2), 'application/json');
+
+$('adCompartir').onclick = () => {
+  try {
+    const clon = document.documentElement.cloneNode(true);
+    clon.removeAttribute('style');
+    const b = clon.querySelector('body'); b.removeAttribute('class');
+    clon.querySelectorAll('[data-dinamico]').forEach(el => { el.innerHTML = ''; });
+    const m = clon.querySelector('#mapa'); ['class','style','tabindex'].forEach(a => m.removeAttribute(a));
+    clon.querySelector('#datos-publicados').textContent = 'const DATOS_PUBLICADOS = ' + JSON.stringify(datosActuales()).replace(/</g,'\\u003c') + ';';
+    descargar('Mapa_Colina_para_compartir_' + hoy() + '.html', '<!DOCTYPE html>\n' + clon.outerHTML, 'text/html');
+    aviso('✅ Archivo creado. Envíe ese archivo a las demás personas.');
+  } catch(err) { alert('No se pudo crear el archivo: ' + err.message); }
+};
+
+function procesarKML(texto){
+  try {
+    const xml = new DOMParser().parseFromString(texto, 'text/xml');
+    const pms = xml.getElementsByTagName('Placemark'), links = xml.getElementsByTagName('NetworkLink');
+    let n = 0; const hn = cargarNuevos();
+    for (const p of pms) {
+      const nombre = (p.getElementsByTagName('name')[0] || {textContent:'Hito KML'}).textContent.trim();
+      const desc = (p.getElementsByTagName('description')[0] || {textContent:''}).textContent.trim() || 'Coordenadas KML';
+      const c = p.getElementsByTagName('coordinates')[0]; if (!c) continue;
+      const r = c.textContent.trim().split(/\s+/)[0].split(',');
+      const lng = parseFloat(r[0]), lat = parseFloat(r[1]); if (isNaN(lat) || isNaN(lng)) continue;
+      const h = {categoria:'KML Importado', nombre, direccion:desc, telefono:'', lat, lng, estado:'ok'};
+      hn.push(h); servicios.push(h); crearMarcador(h); n++;
+    }
+    if (n) { escribir(K.nuevos, hn); nuevos = hn; actualizarVista(false); alert('✅ Se importaron ' + n + ' lugares desde el archivo KML/XML.'); }
+    else if (links.length) alert('Se detectó un KML con enlace externo, sin puntos propios.');
+    else alert('No se encontraron puntos (<Placemark>) en el archivo.');
+  } catch(err) { alert('Error al procesar el KML: ' + err.message); }
+}
+$('adImportar').onclick = () => {
+  const inp = document.createElement('input'); inp.type = 'file'; inp.accept = '.json,.kml,.xml,application/json,application/vnd.google-earth.kml+xml';
+  inp.onchange = e => {
+    const f = e.target.files[0]; if (!f) return;
+    const rd = new FileReader();
+    rd.onload = ev => {
+      const t = ev.target.result;
+      if (/\.(kml|xml)$/i.test(f.name) || t.trim().startsWith('<')) { procesarKML(t); return; }
+      try {
+        const d = JSON.parse(t);
+        if (d.cesfam) escribir(K.asig, d.cesfam); if (d.resenas) escribir(K.res, d.resenas);
+        if (d.correccionesHitos) escribir(K.corr, d.correccionesHitos);
+        if (d.hitosNuevos) escribir(K.nuevos, d.hitosNuevos); if (d.hitosEliminados) escribir(K.elim, d.hitosEliminados);
+        alert('✅ Respaldo cargado. Se recargará el mapa.'); location.reload();
+      } catch(err) { alert('Error al leer el archivo JSON: ' + err.message); }
+    };
+    rd.readAsText(f);
+  };
+  inp.click();
+};
+$('adReset').onclick = () => {
+  if (!confirm('¿Borrar todos los cambios guardados en este aparato?')) return;
+  Object.values(K).forEach(k => { if (k !== K.letra) { try{ localStorage.removeItem(k); }catch(e){} } });
+  location.reload();
+};
+
+function setAdmin(v){
+  document.body.classList.toggle('admin', v);
+  if (!v) { salirModoMapa(); if (location.hash === '#editar') history.replaceState(null,'',location.pathname + location.search); }
+  contarEdiciones(); if (seleccion) renderFicha(seleccion);
+  aviso(v ? '🔧 Modo administrador activado.' : 'Modo administrador desactivado.');
+}
+$('adSalir').onclick = () => setAdmin(false);
+let taps = 0, tapT = null;
+$('marca').addEventListener('click', () => {
+  taps++; clearTimeout(tapT); tapT = setTimeout(() => { taps = 0; }, 2500);
+  if (taps >= 5) { taps = 0; setAdmin(!esAdmin()); }
+});
+window.addEventListener('hashchange', () => { if (location.hash === '#editar') setAdmin(true); });
+
+/* ================= Tamaño de letra y conexión ================= */
+const LETRAS = [{n:'Normal',px:18},{n:'Grande',px:21},{n:'Muy grande',px:24}];
+let letra = Math.min(Math.max(parseInt(leer(K.letra,0),10) || 0, 0), LETRAS.length-1);
+function aplicarLetra(){
+  document.documentElement.style.fontSize = LETRAS[letra].px + 'px';
+  $('letraEtiqueta').textContent = 'Letra: ' + LETRAS[letra].n;
+  setTimeout(() => map.invalidateSize(), 50);
+}
+$('btnLetra').onclick = () => { letra = (letra + 1) % LETRAS.length; try{ localStorage.setItem(K.letra, JSON.stringify(letra)); }catch(e){} aplicarLetra(); aviso('Tamaño de letra: ' + LETRAS[letra].n); };
+function revisarRed(){ $('sinRed').hidden = navigator.onLine !== false; }
+window.addEventListener('online', revisarRed); window.addEventListener('offline', revisarRed);
+
+/* ================= Inicio ================= */
+aplicarLetra(); revisarRed(); contarEdiciones();
+$('panel').classList.toggle('abierto', esMovil());
+$('ficha').hidden = true; $('aviso').hidden = true;
+actualizarVista(true);
+if (location.hash === '#editar') setAdmin(true);
+})();
+</script>
+
+</body></html>
